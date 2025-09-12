@@ -29,21 +29,25 @@ Getting started: used ai to help me pickup from where teamate leftoff and tell m
 ### Prompts Used
 "these are the instructions for my assignment attached and this is what I have so far, can you explain to me what still needs to be done and give me a psuedo code layout with explanations"
 
+"This is the assignment explain what else needs to be done"
+
+"How does my code look now?"
+
 ### AI Output/Results
 AI gave me psuedo code changes and fixes as well as a layout of what needed to still be done
 
+Claude helped provide details on what was missing and needed to be added, and also pointed out some errors
+
+Pointed out one issue with activation boundary detection and provided a simpler approach than what we were previously using
+
 ### How Output was Verified/Edited
-I reviewed and implemented my own code using the psuedo code template for guidance and ideas, then tested inputs to insure they worked
+I reviewed and implemented my own code using the psuedo code template for guidance and ideas, then tested my code to insure it worked
 
 ### Multiple Iterations (if applicable)
-[If you used AI tools multiple times, provide a dialogue/conversation summary]
-[e.g., First asked for algorithm explanation, then requested code example, finally asked for optimization suggestions]
-[e.g., Had 3-turn conversation about debugging process: initial problem → AI suggestion → follow-up clarification]
+First asked for psuedo code and a layout to get started, after implementing code asked what else needed to be done and how my current code was looking, finally asked for review of finished code
 
 ### Learning & Reflection
-[Reflect on what you learned and how the AI assistance contributed to your understanding]
-[e.g., I learned about proper error handling techniques and improved my debugging skills]
-[e.g., Understanding of cryptographic concepts was enhanced through AI explanations]
+I have a better understanding of navigating code and organizing my thoughts when starting, I also got an insight on debugging and fixing issues with my code
 
 ---
 
