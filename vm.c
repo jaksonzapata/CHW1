@@ -67,52 +67,55 @@ int base(int BP, int L)
 // print instruction + PC/BP/SP + a readable stack
 void print_trace(const char *instr_name, int L, int M)
 {
-  static int first = 1;
-  if (first)
-  {
-    printf("L M PC BP SP stack\n");
-    printf("Initial values: %d %d %d\n", pc, bp, sp);
-    first = 0;
-    return;
-  }
+  printf("%s %d %d %d %d %d ", instr_name, L, M, pc, bp, sp);
 
-  /* Instruction/regs line */
-  printf("%-3s %d %d %d %d %d  ", instr_name, L, M, pc, bp, sp);
-
-  /* Mark activation-record bases by walking static links */
-  int bar[500] = {0};
-  int walk = bp;
-  while (walk > 0 && walk < 500)
-  {
-    bar[walk] = 1;        /* put a '|' before cell at this index */
-    int next = pas[walk]; /* SL is stored at [BP] */
-    if (next == walk)
-      break; /* defensive: avoid loop if corrupted */
-    walk = next;
-  }
-
-  /* Decide how far to print:
-     - Always print from sp up through the current AR base (bp).
-     - Extend further to include caller frames by following SL bases.
-  */
-  int stop = bp;
-  int probe = bp;
-  while (probe > 0 && probe < 500 && bar[probe])
-  {
-    int next = pas[probe]; /* caller's base via SL */
-    if (next <= 0 || next >= 500 || next == probe)
+  // find all activation record boundaries by following static links
+  int ar_bases[100]; // store AR base addresses
+  int ar_count = 0;
+  
+  // start from current bp and follow static links
+  int current_ar = bp;
+  while (current_ar > 0 && current_ar < 500 && ar_count < 100) {
+    ar_bases[ar_count] = current_ar;
+    ar_count++;
+    
+    // follow static link to get parent AR base
+    int next_ar = pas[current_ar];
+    if (next_ar <= 0 || next_ar >= 500 || next_ar == current_ar) {
       break;
-    if (next > stop)
-      stop = next; /* include caller base in printout */
-    probe = next;
+    }
+    current_ar = next_ar;
   }
-
-  for (int i = sp; i <= stop; i++)
-  {
-    if (bar[i])
-      printf("| ");
+  
+  // print stack from SP upward, inserting | at AR boundaries
+  int max_print = (ar_count > 0) ? ar_bases[ar_count - 1] + 10 : sp + 20;
+  if (max_print >= 500) max_print = 499;
+  
+  for (int i = sp; i <= max_print; i++) {
+    // check if this address is an AR boundary
+    if (i > sp) {
+      for (int j = 0; j < ar_count; j++) {
+        if (i == ar_bases[j] + 1) {
+          printf("| ");
+          break;
+        }
+      }
+    }
     printf("%d ", pas[i]);
+    
+    // stop printing if we've gone far enough 
+    if (i > sp + 15 && pas[i] == 0) {
+      int all_zeros = 1;
+      for (int k = i + 1; k <= max_print && k < i + 5; k++) {
+        if (pas[k] != 0) {
+          all_zeros = 0;
+          break;
+        }
+      }
+      if (all_zeros) break;
+    }
   }
+  
   printf("\n");
 }
 
@@ -159,8 +162,9 @@ int main(int argc, char *argv[])
   sp = last_m_index_used; /* top of stack starts right below code */
   bp = sp - 1;            /* base is one above the (empty) stack */
 
-  /* Print initial line */
-  print_trace("INIT", 0, 0);
+  /* Print initial values and header */
+  printf("L M PC BP SP stack\n");
+  printf("Initial values: %d %d %d\n", pc, bp, sp);
 
   /* 4) Fetch–Execute loop */
   int halt = 0;
