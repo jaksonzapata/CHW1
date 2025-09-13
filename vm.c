@@ -32,6 +32,7 @@ Due Date: Friday , September 12th , 2025
 #include <stdlib.h>
 
 // Single process address
+static const int CODE_TOP = 499; // first OP is stored at pas[499]
 static int pas[500] = {0};
 
 // Registers
@@ -67,41 +68,52 @@ int base(int BP, int L)
 // print instruction + PC/BP/SP + a readable stack
 void print_trace(const char *instr_name, int L, int M)
 {
+  /* instruction + regs */
   printf("%s %d %d %d %d %d ", instr_name, L, M, pc, bp, sp);
 
-    // Mark activation record boundaries by walking static links
+  /* Mark AR bases (SL slots) by walking static links from current bp */
   int bar[500] = {0};
   int walk = bp;
-  while (walk > 0 && walk < 500) 
+  while (walk > 0 && walk < 500)
   {
-    bar[walk] = 1;        // put a '|' before cell at this index
-    int next = pas[walk]; // SL is stored at [BP]
-    if (next == walk || next <= 0 || next >= 500) 
-      break; // defensive: avoid loop if corrupted
+    bar[walk] = 1;        /* put a '|' before the SL cell of this frame */
+    int next = pas[walk]; /* SL is stored at [BP] */
+    if (next == walk || next <= 0 || next >= 500)
+      break;
     walk = next;
   }
 
-  // Decide how far to print: always print from sp up through the current AR base (bp)
-  // Extend further to include caller frames by following SL bases
+  /* Decide how far to print (include caller frames so the bar shows up) */
   int stop = bp;
   int probe = bp;
-  while (probe > 0 && probe < 500 && bar[probe]) 
+  while (probe > 0 && probe < 500 && bar[probe])
   {
-    int next = pas[probe]; // caller's base via SL
+    int next = pas[probe]; /* caller’s base via SL */
     if (next <= 0 || next >= 500 || next == probe)
       break;
     if (next > stop)
-      stop = next; // include caller base in printout
+      stop = next; /* expand to include the caller base */
     probe = next;
   }
 
-  for (int i = sp; i <= stop; i++) 
+  /* Collect stack cells sp..stop, then print in REVERSE so top is at the RIGHT */
+  int buf[500];
+  int sep[500]; /* whether to print a bar before this cell in the reversed view */
+  int n = 0;
+  for (int i = sp; i <= stop; i++)
   {
-    if (bar[i])
-      printf("| ");
-    printf("%d ", pas[i]);
+    buf[n] = pas[i];
+    sep[n] = bar[i]; /* bar should appear immediately before this cell when printing */
+    n++;
   }
-  
+
+  /* Print reversed: left -> older/lower priority, right -> top of stack */
+  for (int k = n - 1; k >= 0; k--)
+  {
+    if (sep[k])
+      printf("| ");
+    printf("%d ", buf[k]);
+  }
   printf("\n");
 }
 
@@ -275,18 +287,12 @@ int main(int argc, char *argv[])
     break;
 
     case 5:
-    { /* CAL L a : call procedure; create AR */
-      /* Reserve 3 words just above current top (stack grows down):
-         [sp-1] = SL = base(bp, L)
-         [sp-2] = DL = bp
-         [sp-3] = RA = pc
-         Then set bp and jump.
-      */
+    {                               /* CAL L a */
       pas[sp - 1] = base(bp, IR.l); /* SL */
       pas[sp - 2] = bp;             /* DL */
-      pas[sp - 3] = pc;             /* RA (pc already moved past fetch) */
+      pas[sp - 3] = pc;             /* RA (after fetch) */
       bp = sp - 1;
-      pc = IR.m;
+      pc = CODE_TOP - IR.m; // was: pc = IR.m;
       print_trace("CAL", IR.l, IR.m);
     }
     break;
@@ -300,16 +306,16 @@ int main(int argc, char *argv[])
 
     case 7:
     { /* JMP 0 a : unconditional jump */
-      pc = IR.m;
+      pc = CODE_TOP - IR.m;
       print_trace("JMP", IR.l, IR.m);
     }
     break;
 
     case 8:
-    { /* JPC 0 a : jump if top == 0; then pop */
+    { /* JPC 0 a */
       if (pas[sp] == 0)
       {
-        pc = IR.m;
+        pc = CODE_TOP - IR.m; // was: pc = IR.m;
       }
       sp = sp + 1;
       print_trace("JPC", IR.l, IR.m);
