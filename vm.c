@@ -68,46 +68,46 @@ int base(int BP, int L)
 // print instruction + PC/BP/SP + a readable stack
 void print_trace(const char *instr_name, int L, int M)
 {
-  /* instruction + regs */
+  // instruction + regs
   printf("%s %d %d %d %d %d ", instr_name, L, M, pc, bp, sp);
 
-  /* Mark AR bases (SL slots) by walking static links from current bp */
+  // Mark AR bases with a '|'
   int bar[500] = {0};
   int walk = bp;
   while (walk > 0 && walk < 500)
   {
-    bar[walk] = 1;        /* put a '|' before the SL cell of this frame */
-    int next = pas[walk]; /* SL is stored at [BP] */
+    bar[walk] = 1;        // '|' before the SL cell
+    int next = pas[walk]; // SL is stored at [BP]
     if (next == walk || next <= 0 || next >= 500)
       break;
     walk = next;
   }
 
-  /* Decide how far to print (include caller frames so the bar shows up) */
+  // Decide how far to print
   int stop = bp;
   int probe = bp;
   while (probe > 0 && probe < 500 && bar[probe])
   {
-    int next = pas[probe]; /* caller’s base via SL */
+    int next = pas[probe]; // caller’s base via SL
     if (next <= 0 || next >= 500 || next == probe)
       break;
     if (next > stop)
-      stop = next; /* expand to include the caller base */
+      stop = next; // expand to include the caller base
     probe = next;
   }
 
-  /* Collect stack cells sp..stop, then print in REVERSE so top is at the RIGHT */
+  // Collect stack cells sp..stop, then print in REVERSE so top is at the RIGHT
   int buf[500];
-  int sep[500]; /* whether to print a bar before this cell in the reversed view */
+  int sep[500]; // whether to print a bar before this cell in the reversed view
   int n = 0;
   for (int i = sp; i <= stop; i++)
   {
     buf[n] = pas[i];
-    sep[n] = bar[i]; /* bar should appear immediately before this cell when printing */
+    sep[n] = bar[i]; // bar should appear immediately before this cell when printing
     n++;
   }
 
-  /* Print reversed: left -> older/lower priority, right -> top of stack */
+  // Print reversed: left -> older/lower priority, right -> top of stack
   for (int k = n - 1; k >= 0; k--)
   {
     if (sep[k])
@@ -119,14 +119,14 @@ void print_trace(const char *instr_name, int L, int M)
 
 int main(int argc, char *argv[])
 {
-  /* 1) Argument check: exactly one input file */
+  // 1) Argument check: exactly one input file
   if (argc != 2)
   {
     fprintf(stderr, "Error: expected one input file (each line: OP L M).\n");
     return 1;
   }
 
-  /* 2) Load code into PAS from the top (499,498,497 ... downward) */
+  // 2) Load code into PAS from the top (499,498,497 ... downward)
   FILE *in = fopen(argv[1], "r");
   if (!in)
   {
@@ -134,9 +134,9 @@ int main(int argc, char *argv[])
     return 1;
   }
 
-  int load_idx = 499; /* OP goes here; L at -1; M at -2 */
+  int load_idx = 499; // OP goes here;
   int op, l, m;
-  int last_m_index_used = 500; /* lowest (smallest) address touched by code */
+  int last_m_index_used = 500; // lowest (smallest) address touched by code
 
   while (fscanf(in, "%d %d %d", &op, &l, &m) == 3)
   {
@@ -150,40 +150,35 @@ int main(int argc, char *argv[])
     pas[load_idx - 1] = l;
     pas[load_idx - 2] = m;
 
-    last_m_index_used = load_idx - 2; /* track lowest code addr used */
+    last_m_index_used = load_idx - 2; // track lowest code addr used
     load_idx -= 3;
   }
   fclose(in);
 
-  /* 3) Initialize registers per spec */
-  pc = 499;               /* before first fetch */
-  sp = last_m_index_used; /* top of stack starts right below code */
-  bp = sp - 1;            /* base is one above the (empty) stack */
+  // 3) Initialize registers per spec
+  pc = 499;               // before first fetch
+  sp = last_m_index_used; // top of stack starts right below code
+  bp = sp - 1;            // base is one above the (empty) stack
 
-  /* Print initial values and header */
+  // Print initial values and header
   printf("L M PC BP SP stack\n");
   printf("Initial values: %d %d %d\n", pc, bp, sp);
 
-  /* 4) Fetch–Execute loop */
+  // 4) Fetch–Execute loop
   int halt = 0;
   while (!halt)
   {
-    /* ---- Fetch (code stored downward; 3 ints per instruction) ----
-       IR.op = pas[pc];
-       IR.l  = pas[pc-1];
-       IR.m  = pas[pc-2];
-       pc    = pc - 3;
-    */
+    // ---- Fetch ----
     IR.op = pas[pc];
     IR.l = pas[pc - 1];
     IR.m = pas[pc - 2];
     pc -= 3;
 
-    /* ---- Execute ---- */
+    // --- Execute ----
     switch (IR.op)
     {
     case 1:
-    { /* LIT 0 n : push literal n */
+    { // LIT 0 n
       sp = sp - 1;
       pas[sp] = IR.m;
       print_trace("LIT", IR.l, IR.m);
@@ -191,73 +186,73 @@ int main(int argc, char *argv[])
     break;
 
     case 2:
-    { /* OPR 0 m : arithmetic / logical / return */
+    { // OPR 0 m : arithmetic / logical / return
       switch (IR.m)
       {
       case 0:
       {
         sp = bp + 1;
-        bp = pas[sp - 2]; /* DL */
-        pc = pas[sp - 3]; /* RA */
+        bp = pas[sp - 2]; // DL
+        pc = pas[sp - 3]; // RA
         print_trace("RTN", IR.l, IR.m);
       }
       break;
 
-      case 1: /* ADD */
+      case 1: // ADD
         pas[sp + 1] = pas[sp + 1] + pas[sp];
         sp = sp + 1;
         print_trace("ADD", IR.l, IR.m);
         break;
 
-      case 2: /* SUB */
+      case 2: // SUB
         pas[sp + 1] = pas[sp + 1] - pas[sp];
         sp = sp + 1;
         print_trace("SUB", IR.l, IR.m);
         break;
 
-      case 3: /* MUL */
+      case 3: // MUL
         pas[sp + 1] = pas[sp + 1] * pas[sp];
         sp = sp + 1;
         print_trace("MUL", IR.l, IR.m);
         break;
 
-      case 4: /* DIV (integer) */
+      case 4: // DIV
         pas[sp + 1] = pas[sp + 1] / pas[sp];
         sp = sp + 1;
         print_trace("DIV", IR.l, IR.m);
         break;
 
-      case 5: /* EQL */
+      case 5: // EQL
         pas[sp + 1] = (pas[sp + 1] == pas[sp]);
         sp = sp + 1;
         print_trace("EQL", IR.l, IR.m);
         break;
 
-      case 6: /* NEQ */
+      case 6: // NEQ
         pas[sp + 1] = (pas[sp + 1] != pas[sp]);
         sp = sp + 1;
         print_trace("NEQ", IR.l, IR.m);
         break;
 
-      case 7: /* LSS */
+      case 7: // LSS
         pas[sp + 1] = (pas[sp + 1] < pas[sp]);
         sp = sp + 1;
         print_trace("LSS", IR.l, IR.m);
         break;
 
-      case 8: /* LEQ */
+      case 8: // LEQ
         pas[sp + 1] = (pas[sp + 1] <= pas[sp]);
         sp = sp + 1;
         print_trace("LEQ", IR.l, IR.m);
         break;
 
-      case 9: /* GTR */
+      case 9: // GTR
         pas[sp + 1] = (pas[sp + 1] > pas[sp]);
         sp = sp + 1;
         print_trace("GTR", IR.l, IR.m);
         break;
 
-      case 10: /* GEQ */
+      case 10: // GEQ
         pas[sp + 1] = (pas[sp + 1] >= pas[sp]);
         sp = sp + 1;
         print_trace("GEQ", IR.l, IR.m);
